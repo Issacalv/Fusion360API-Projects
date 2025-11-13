@@ -19,25 +19,40 @@ def findFolderRecursive(parentFolder, targetName):
     return None
 
 
-def insert_shape_file(file, rootComp, ui):
+def insert_all_shapes(shape_files, rootComp, ui):
 
-    transform = adsk.core.Matrix3D.create()
+    inserted_occurrences = []
 
-    try:
-        ui.messageBox("Attempting normal insert (isReferencedComponent=False)...")
-        occ = rootComp.occurrences.addByInsert(file, transform, False)
-        return occ
-    except Exception as e:
-        ui.messageBox(f"Normal insert failed with error:\n\n{e}")
+    for df in shape_files:
+        ui.messageBox(f"Inserting '{df.name}'...")
 
-    try:
-        ui.messageBox("Attempting version=1 insert (isReferencedComponent=False)...")
-        occ = rootComp.occurrences.addByInsert(file, transform, False, 1)
-        return occ
-    except Exception as e:
-        ui.messageBox(f"Version=1 insert failed with error:\n\n{e}")
+        transform = adsk.core.Matrix3D.create()
 
-    return None
+        # Normal insert
+        try:
+            occ = rootComp.occurrences.addByInsert(df, transform, False)
+            if occ:
+                inserted_occurrences.append(occ)
+                ui.messageBox(f"Inserted '{df.name}'")
+                continue
+        except Exception as e:
+            ui.messageBox(f"Normal insert failed for {df.name}:\n\n{e}")
+
+        # Versioned insert
+        try:
+            occ = rootComp.occurrences.addByInsert(df, transform, False, 1)
+            if occ:
+                inserted_occurrences.append(occ)
+                ui.messageBox(f"Inserted (versioned) '{df.name}'")
+                continue
+        except Exception as e:
+            ui.messageBox(f"Versioned insert failed for {df.name}:\n\n{e}")
+
+        # Failure
+        ui.messageBox(f"FAILED to insert '{df.name}'")
+
+    return inserted_occurrences
+
 
 
 def run(context):
@@ -80,21 +95,17 @@ def run(context):
             ui.messageBox("Missing:\n" + "\n".join(missing))
             return
 
-        first_file = found_files[0]
+        # Insert ALL shapes
+        inserted_occ = insert_all_shapes(found_files, rootComp, ui)
+
+        if not inserted_occ:
+            ui.messageBox("No shapes were inserted.")
+            return
 
         ui.messageBox(
-            f"INSERT TEST:\n\n"
-            f"Name: {first_file.name}\n"
-            f"Extension: {first_file.fileExtension}\n"
-            f"ID: {first_file.id}\n"
+            f"SUCCESS: Inserted all {len(inserted_occ)} shapes.\n\n"
+            "Next: Auto-align shapes."
         )
-
-        occ = insert_shape_file(first_file, rootComp, ui)
-
-        if occ:
-            ui.messageBox(f"SUCCESS: Inserted shape '{first_file.name}'")
-        else:
-            ui.messageBox(f"Insert failed.\nCheck error messages shown.")
 
     except:
         if ui:
